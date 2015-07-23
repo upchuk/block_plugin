@@ -1,0 +1,4 @@
+name = Block Plugin
+description = Using cTools plugins to define Drupal core blocks
+core = 7.x
+dependencies[] = ctools

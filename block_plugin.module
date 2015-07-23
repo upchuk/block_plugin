@@ -1,0 +1,168 @@
+<?php
+
+define('DELTA_PREFIX', 'block_plugin_');
+
+/**
+ * Implements hook_ctools_plugin_type()
+ */
+function block_plugin_ctools_plugin_type() {
+  return array(
+    'block' => array(
+      'label' => 'Block',
+      'use hooks' => FALSE,
+      'process' => 'block_plugin_process_plugin'
+    )
+  );
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function block_plugin_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'block_plugin' && in_array($plugin, array_keys(block_plugin_ctools_plugin_type())) ) {
+    return 'plugins/' . $plugin;
+  }
+}
+
+/**
+ * Processes a plugin
+ *
+ * @param $plugin
+ * @param $info
+ */
+function block_plugin_process_plugin(&$plugin, $info) {
+  // Add a block admin title
+  if (!isset($plugin['admin title'])) {
+    $exploded = explode('_', $plugin['name']);
+    $name = '';
+    foreach ($exploded as $part) {
+      $name .= ucfirst($part) . ' ';
+    }
+    $plugin['admin title'] = $name;
+  }
+
+  // By default we also show a block title but this can be overwritten
+  if (!isset($plugin['show title'])) {
+    $plugin['show title'] = TRUE;
+  }
+
+  // Add a block view function
+  if (!isset($plugin['view'])) {
+    $plugin['view'] = $plugin['module'] . '_' . $plugin['name'] . '_view';
+  }
+
+  // Add a block form function
+  if (!isset($plugin['configure'])) {
+    $plugin['configure'] = $plugin['module'] . '_' . $plugin['name'] . '_configure';
+  }
+
+  // Add a block save function
+  if (!isset($plugin['save'])) {
+    $plugin['save'] = $plugin['module'] . '_' . $plugin['name'] . '_save';
+  }
+}
+
+/**
+ * Returns an array of all the Block plugins
+ *
+ * @return array
+ */
+function block_plugin_get_all_plugins() {
+  return ctools_get_plugins('block_plugin', 'block');
+}
+
+/**
+ * Returns a Block plugin
+ *
+ * @return array
+ */
+function block_plugin_get_plugin($name) {
+  return ctools_get_plugins('block_plugin', 'block', $name);
+}
+
+/**
+ * Returns a plugin from a block delta or FALSE if not a plugin delta
+ *
+ * @param $delta
+ * @return array|bool
+ */
+function block_plugin_plugin_from_delta($delta) {
+  $prefix_length = strlen(DELTA_PREFIX);
+  $name = substr($delta, $prefix_length);
+  $plugin = block_plugin_get_plugin($name);
+  return $plugin ? $plugin : FALSE;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function block_plugin_block_info() {
+  $blocks = array();
+
+  $plugins = block_plugin_get_all_plugins();
+  foreach ($plugins as $plugin) {
+    $blocks[DELTA_PREFIX . $plugin['name']] = array(
+      'info' => $plugin['admin title'],
+    );
+  }
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function block_plugin_block_view($delta = '') {
+  $plugin = block_plugin_plugin_from_delta($delta);
+  if (!$plugin) {
+    return;
+  }
+
+  if (!function_exists($plugin['view'])) {
+    return;
+  }
+
+  $block = array();
+
+  // Optional title
+  if (isset($plugin['title']) && $plugin['show title'] !== FALSE) {
+    $block['subject'] = $plugin['title'];
+  }
+
+  // Block content
+  $block['content'] = $plugin['view']($delta);
+
+  return $block;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function block_plugin_block_configure($delta = '') {
+  $plugin = block_plugin_plugin_from_delta($delta);
+  if (!$plugin) {
+    return;
+  }
+
+  if (!function_exists($plugin['configure'])) {
+    return;
+  }
+
+  return $plugin['configure']($delta);
+}
+
+/**
+ * Implements hook_block_save().
+ */
+function block_plugin_block_save($delta = '', $edit = array()) {
+  $plugin = block_plugin_plugin_from_delta($delta);
+  if (!$plugin) {
+    return;
+  }
+
+  if (!function_exists($plugin['save'])) {
+    return;
+  }
+
+  return $plugin['save']($edit);
+}
